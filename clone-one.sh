@@ -109,7 +109,7 @@ then
     echo "need to clone a vm" > /dev/null 2>&1
 else 
     VBoxManage clonevm $VM_NAME --name $NEW_VM_NAME --register --basefolder $VMs_PATH
-    sleep 60
+    #sleep 60
 fi
 # 启动
 VBoxManage list runningvms | sed "s#{.*}##g" | grep $NEW_VM_NAME
@@ -118,7 +118,7 @@ then
   echo "has been started before" > /dev/null 2>&1
 else
   VBoxManage startvm $NEW_VM_NAME --type headless
-  sleep 60
+  sleep 100
 fi
 
 
@@ -170,10 +170,8 @@ cat /etc/hostname
 
 
 # 设置
-cat /etc/hosts | grep "127.0.0.1" | grep "${NEW_VM_HOST_NAME}" > /dev/null 2>&1
-if [ $? -eq 0 ];then
-  echo "yes" > /dev/null 2>&1
-else
+# cat /etc/hosts | grep "127.0.0.1" | grep "${NEW_VM_HOST_NAME}" > /dev/null 2>&1
+
   #echo  "no"
   # 在匹配的行前添加#(注释)
   #sed  '/127.0.0.1 */ s/^/#/g' /etc/hosts
@@ -184,12 +182,10 @@ else
   sed -i "s/127.0.0.1.*//g" /etc/hosts
   sed -i '/^\s*$/d' /etc/hosts
   echo "127.0.0.1 $NEW_VM_HOST_NAME" >> /etc/hosts
-fi
 
-cat /etc/hosts | grep "::1" | grep $NEW_VM_HOST_NAME > /dev/null 2>&1
-if [ $? -eq 0 ];then
-  echo "yes" > /dev/null 2>&1
-else
+
+# cat /etc/hosts | grep "::1" | grep $NEW_VM_HOST_NAME > /dev/null 2>&1
+
   #echo  "no"
   # 在匹配的行前添加#
   #sed  '/::1 */ s/^/#/g' /etc/hosts
@@ -198,7 +194,7 @@ else
   sed -i "s/::1.*//g" /etc/hosts
   sed -i '/^\s*$/d' /etc/hosts
   echo "::1 $NEW_VM_HOST_NAME" >> /etc/hosts
-fi
+
 
 # 查看
 cat /etc/hosts
