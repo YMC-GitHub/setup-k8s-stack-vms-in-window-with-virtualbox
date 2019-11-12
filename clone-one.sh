@@ -11,6 +11,7 @@
 # 修改域名解析地址
 
 
+
 VMs_PATH="D:\\VirtualBox\\Administrator\\VMs"
 mkdir -p $VMs_PATH
 cd $VMs_PATH
@@ -23,14 +24,14 @@ VM_BASE_PATH=${VMs_PATH}${PATH_SPLIT_SYMBOL}${VM_PATH}
 echo $VM_BASE_PATH
 VM_NAME=$VM_PATH
 
-NEW_VM_PATH=k8s-node-4
+NEW_VM_NAME=k8s-node-6
+NEW_VM_PATH=$NEW_VM_NAME
 NEW_VM_BASE_FOLEDR=${VMs_PATH}${PATH_SPLIT_SYMBOL}${NEW_VM_PATH}
-NEW_VM_NAME=$NEW_VM_PATH
 PRIVITE_KEY_FILE_NAME=google-clound-ssr
 PRIVITE_KEY_FILE_PATH=~/.ssh/
 OLD_VM_SSH_SERVER_IP=192.168.2.2
 OLD_VM_SSH_SERVER_USER=root
-NEW_VM_SSH_SERVER_IP=192.168.2.4
+NEW_VM_SSH_SERVER_IP=192.168.2.6
 NEW_VM_SSH_SERVER_USER=root
 NEW_VM_HOST_NAME=$NEW_VM_NAME
 
@@ -46,12 +47,60 @@ NEW_VM_NETMASK=255.255.255.0
 NEW_VM_GATEWAY=192.168.2.1
 
 
+FILE_PATH=$(cd `dirname $0`; pwd)
+
+mkdir -p ~/shell-get-config
+echo "FILE_PATH:${FILE_PATH}" >> ~/shell-get-config/debug.log
+
+# 帮助信息
+USAGE_MSG="args:\
+  -n,--NEW_VM_NAME desc\t\n\
+  -i,--NEW_VM_SSH_SERVER_IP desc\
+"
+# 参数规则
+GETOPT_ARGS_SHORT_RULE="-o n:i:"
+GETOPT_ARGS_LONG_RULE="--long NEW_VM_NAME:,NEW_VM_SSH_SERVER_IP:"
+
+# 显示帮助信息
+
+
+# 设置参数规则
+GETOPT_ARGS=`getopt $GETOPT_ARGS_SHORT_RULE \
+$GETOPT_ARGS_LONG_RULE -- "$@"`
+# 解析参数规则
+eval set -- "$GETOPT_ARGS"
+
+# 更新相关变量
+while [ -n "$1" ]
+do
+    case $1 in
+    -n|--NEW_VM_NAME)
+    NEW_VM_NAME=$2
+    shift 2
+    ;;
+    -i|--NEW_VM_SSH_SERVER_IP)
+    NEW_VM_SSH_SERVER_IP=$2
+    shift 2
+    ;;
+    --)
+    break
+    ;;
+    *)
+    printf "$USAGE_MSG"
+    ;;
+    esac
+done
+
+
+# 输出相关变量
+echo $NEW_VM_NAME,$NEW_VM_SSH_SERVER_IP
+
 
 # 关闭
 VBoxManage list runningvms | sed "s#{.*}##g" | grep $VM_NAME
 if [ $? -eq 0 ];then
     VBoxManage controlvm $VM_NAME poweroff
-    sleep 10
+    sleep 60
 fi
 # 克隆
 VBoxManage list vms | sed "s#{.*}##g" | grep $NEW_VM_NAME
@@ -60,7 +109,7 @@ then
     echo "need to clone a vm" > /dev/null 2>&1
 else 
     VBoxManage clonevm $VM_NAME --name $NEW_VM_NAME --register --basefolder $VMs_PATH
-    sleep 20
+    sleep 60
 fi
 # 启动
 VBoxManage list runningvms | sed "s#{.*}##g" | grep $NEW_VM_NAME
@@ -69,8 +118,9 @@ then
   echo "has been started before" > /dev/null 2>&1
 else
   VBoxManage startvm $NEW_VM_NAME --type headless
-  sleep 40
+  sleep 60
 fi
+
 
 # 登录
 #ssh root@192.168.2.2
@@ -103,6 +153,7 @@ ONBOOT=yes
 centos-set-static-ip-address
 
 #service network restart
+#sleep 5
 # 查看
 cat /etc/sysconfig/network-scripts/ifcfg-${NEW_VM_NET_CARD_NAME} | grep --extended-regexp "IPADDR.*(.*.)\..*"
 }
@@ -174,6 +225,7 @@ set_host_name
 set_dns_resovle_in_china
 #2 ...
 # 退出
+sleep 20
 exit
 run-some-task-on-vm-node
 # 关机
@@ -181,7 +233,7 @@ VBoxManage list runningvms | sed "s#{.*}##g" | grep $NEW_VM_NAME
 if [ $? -eq 0 ]
 then
   VBoxManage controlvm $NEW_VM_NAME poweroff
-  sleep 10
+  sleep 60
 fi
 # 重启
 VBoxManage list runningvms | sed "s#{.*}##g" | grep $NEW_VM_NAME
@@ -190,7 +242,7 @@ then
   echo "has been started before" > /dev/null 2>&1
 else
   VBoxManage startvm $NEW_VM_NAME --type headless
-  sleep 40
+  sleep 60
 fi
 
 # 免密登录
