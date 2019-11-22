@@ -50,6 +50,9 @@ function start() {
     for key in $(echo ${!DIC_HOST_IP_LIST[*]}); do
         #start vm
         echo "start vm $key "
+        VBoxManage startvm "$key" --type headless
+        echo "advice wait a minute,please wait ..."
+        sleep 60
     done
 }
 function init_stack_master() {
@@ -70,5 +73,13 @@ function node_join_stack() {
                 echo "vm $key joins in stack"
             fi
         fi
+    done
+}
+function close() {
+    echo "close vm"
+    for key in $(echo ${!DIC_HOST_IP_LIST[*]}); do
+        #start vm
+        echo "close vm $key "
+        VBoxManage controlvm "$key" poweroff
     done
 }
