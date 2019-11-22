@@ -21,20 +21,7 @@ for var in ${ACTION_LIST_ARR[@]}; do
     fi
 done
 
-ACTION_ORDER=$(
-    cat <<EOF
-action.clone
-action.update
-action.start
-action.init
-action.join
-EOF
-)
-declare -A DIC_ACTION_ORDER
-DIC_ACTION_ORDER=()
-ACTION_ORDER_ARR=(${ACTION_ORDER//,/ })
-REG_SHELL_COMMOMENT_PATTERN="^#"
-for var in ${ACTION_ORDER_ARR[@]}; do
+for var in ${ACTION_LIST_ARR[@]}; do
     if [[ "$var" =~ $REG_SHELL_COMMOMENT_PATTERN ]]; then
         echo "$var" >/dev/null 2>&1
     else
