@@ -1,0 +1,5 @@
+action.clone=clone
+action.update=update
+action.start=start
+action.init=init_stack_master
+action.join=node_join_stack
