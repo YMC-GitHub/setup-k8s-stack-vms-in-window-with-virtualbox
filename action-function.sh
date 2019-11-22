@@ -49,10 +49,15 @@ function start() {
     echo "start vm"
     for key in $(echo ${!DIC_HOST_IP_LIST[*]}); do
         #start vm
-        echo "start vm $key "
-        VBoxManage startvm "$key" --type headless
-        echo "advice wait a minute,please wait ..."
-        sleep 60
+        VBoxManage list runningvms | sed "s#{.*}##g" | grep "$key"
+        if [ $? -eq 0 ]; then
+            echo "has been started before" >/dev/null 2>&1
+        else
+            echo "start vm $key "
+            echo "advice wait a minute,please wait ..."
+            VBoxManage startvm $NEW_VM_NAME --type headless
+            sleep 60
+        fi
     done
 }
 function init_stack_master() {
