@@ -1,6 +1,8 @@
 #!/bin/sh
 
 HOST_IP_LIST=$(cat host-ip-list.txt | sed "s/^#.*//g" | sed "/^$/d")
+template_vm="k8s-node-3"
+
 #echo "$HOST_IP_LIST"
 declare -A DIC_HOST_IP_LIST
 DIC_HOST_IP_LIST=()
@@ -19,7 +21,6 @@ done
 for key in $(echo ${!DIC_HOST_IP_LIST[*]}); do
     #
     #echo "$key : ${DIC_HOST_IP_LIST[$key]}"
-    template_vm="k8s-master-2"
     if [ "$key" = "$template_vm" ]; then
         echo "template vm $key" >/dev/null 2>&1
     else
