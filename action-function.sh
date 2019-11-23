@@ -45,6 +45,27 @@ function update() {
         fi
     done
 }
+function smart_sleep() {
+    local PROGRESS_CHAR="."
+    if [ -n "${1}" ]; then
+        PROGRESS_CHAR="${1}"
+    fi
+    local TIME_LONG=60
+    if [ -n "${2}" ]; then
+        TIME_LONG="${2}"
+    fi
+    local MOD=
+    while [ $TIME_LONG -gt 0 ]; do
+        sleep 1
+        TIME_LONG=$(expr $TIME_LONG - 1)
+        MOD=$(expr $TIME_LONG % 10)
+        if [ $MOD = "0" ]; then
+            echo -n "*"
+        else
+            echo -n "$PROGRESS_CHAR"
+        fi
+    done
+}
 function start() {
     echo "start vm"
     for key in $(echo ${!DIC_HOST_IP_LIST[*]}); do
@@ -56,11 +77,12 @@ function start() {
                 echo "$key has been started before"
             else
                 echo "start vm $key "
-                echo "advice wait a minute,please wait ..."
                 VBoxManage list vms | sed "s#{.*}##g" | grep "$key"
                 if [ $? -eq 0 ]; then
-                    VBoxManage startvm $NEW_VM_NAME --type headless
-                    sleep 60
+                    VBoxManage startvm $key --type headless
+                    echo "advice wait a minute,please wait ..."
+                    smart_sleep "-" 180
+                    #sleep 60
                 fi
             fi
         else
