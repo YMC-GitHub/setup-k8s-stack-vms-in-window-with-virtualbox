@@ -120,6 +120,31 @@ function get_help_msg() {
   fi
   echo "$USAGE_MSG"
 }
+function smart_sleep() {
+  local PROGRESS_CHAR="."
+  if [ -n "${1}" ]; then
+    PROGRESS_CHAR="${1}"
+  fi
+  local TIME_LONG=60
+  if [ -n "${2}" ]; then
+    TIME_LONG="${2}"
+  fi
+  local MOD=
+  while [ $TIME_LONG -gt 0 ]; do
+    sleep 1
+    TIME_LONG=$(expr $TIME_LONG - 1)
+    MOD=$(expr $TIME_LONG % 10)
+    if [ $MOD = "0" ]; then
+      if [ $TIME_LONG = "0" ]; then
+        echo "*"
+      else
+        echo -n "*"
+      fi
+    else
+      echo -n "$PROGRESS_CHAR"
+    fi
+  done
+}
 # 引入相关文件
 PROJECT_PATH=$(path_resolve $THIS_FILE_PATH "../")
 HELP_DIR=$(path_resolve $THIS_FILE_PATH "../help")
@@ -201,7 +226,6 @@ fi
 ###
 #脚本主要代码
 ###
-ouput_debug_msg "caculate relations config ..." "true"
 #被克隆机基径
 VM_BASE_PATH=${VMs_PATH}${PATH_SPLIT_SYMBOL}${VM_PATH}
 #被克隆机名字
@@ -216,7 +240,6 @@ NEW_VM_HOST_NAME=$NEW_VM_NAME
 #电脑地址
 NEW_VM_IPADDR=$NEW_VM_SSH_SERVER_IP
 
-ouput_debug_msg "generate relations dir and file ..." "true"
 mkdir -p $VMs_PATH
 cd $VMs_PATH
 mkdir -p $VM_PATH
@@ -228,15 +251,14 @@ if [[ "$ACTIONS" =~ 'clone_old_vm' ]]; then
   VBoxManage list runningvms | sed "s#{.*}##g" | grep $VM_NAME
   if [ $? -eq 0 ]; then
     VBoxManage controlvm $VM_NAME poweroff
-    sleep 10
+    smart_sleep "2" 10
   fi
   # 克隆被克隆机
   VBoxManage list vms | sed "s#{.*}##g" | grep $NEW_VM_NAME
   if [ $? -eq 0 ]; then
     echo "vm exists" >/dev/null 2>&1
   else
-    ouput_debug_msg "clone old vm $VM_NAME..." "true"
     VBoxManage clonevm $VM_NAME --name $NEW_VM_NAME --register --basefolder $VMs_PATH
-    sleep 40
+    smart_sleep "2" 40
   fi
 fi
