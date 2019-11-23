@@ -25,6 +25,11 @@ for key in $(echo ${!DIC_HOST_IP_LIST[*]}); do
         echo "template vm $key" >/dev/null 2>&1
     else
         echo "delete vm $key"
+        VBoxManage list runningvms | sed "s#{.*}##g" | grep "$key"
+        if [ $? -eq 0 ]; then
+            VBoxManage controlvm "$key" poweroff
+            sleep 10
+        fi
         VBoxManage list vms | sed "s#{.*}##g" | grep "$key"
         if [ $? -eq 0 ]; then
             VBoxManage unregistervm "$key" --delete
