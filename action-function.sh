@@ -5,6 +5,8 @@ HOST_IP_LIST=$(cat host-ip-list.txt | sed "s/^#.*//g" | sed "/^$/d")
 template_vm="k8s-node-3"
 node_label="node"
 master_label="k8s-node-3"
+PRIVITE_KEY_FILE_NAME=google-clound-ssr
+PRIVITE_KEY_FILE_PATH=~/.ssh/
 
 declare -A DIC_HOST_IP_LIST
 DIC_HOST_IP_LIST=()
@@ -41,10 +43,43 @@ function update() {
             echo "update vm $key 's ip and host name"
             ip=${DIC_HOST_IP_LIST[$key]}
             old_ip=${DIC_HOST_IP_LIST[$template_vm]}
-            ./ssh-to-vm.sh --new-vm-name "$key" --new-vm-ip "$ip" --old-vm-ip "$old_ip"
+            #./ssh-to-vm.sh --new-vm-name "$key" --new-vm-ip "$ip" --old-vm-ip "$old_ip"
+            vm_start "$key"
+            ssh -t -t -i ${PRIVITE_KEY_FILE_PATH}${PRIVITE_KEY_FILE_NAME} root@$old_ip <<EOF
+hostnamectl set-hostname "$key"
+sed -i "s/127.0.0.1.*//g" /etc/hosts
+sed -i "s/::1.*//g" /etc/hosts
+sed -i "s/^$//g" /etc/hosts
+echo "127.0.0.1 $key" >>/etc/hosts
+echo "::1 $key" >>/etc/hosts
+sed -i "s/IPADDR=.*/IPADDR=$ip/g" /etc/sysconfig/network-scripts/ifcfg-eth0
+function restart_net() {
+    service network restart && exit 0
+    restart_net
+}
+restart_net
+EOF
+            vm_restart "$key"
+            #
+            #question: connect to host 192.168.2.22 port 22: Connection timed
+            echo "try to ssh to host with new ip $ip..."
+            ssh -t -t -i ${PRIVITE_KEY_FILE_PATH}${PRIVITE_KEY_FILE_NAME} root@$ip <<EOF
+function restart_net() {
+    service network restart && exit 0
+    restart_net
+}
+restart_net
+EOF
+            if [ $? -eq 0 ]; then
+                echo "$key-$ip is ok"
+            fi
+
         fi
     done
 }
+###
+#private fun
+###
 function smart_sleep() {
     local PROGRESS_CHAR="."
     if [ -n "${1}" ]; then
@@ -60,11 +95,68 @@ function smart_sleep() {
         TIME_LONG=$(expr $TIME_LONG - 1)
         MOD=$(expr $TIME_LONG % 10)
         if [ $MOD = "0" ]; then
-            echo -n "*"
+            if [ $TIME_LONG = "0" ]; then
+                echo "*"
+            else
+                echo -n "*"
+            fi
         else
             echo -n "$PROGRESS_CHAR"
         fi
     done
+}
+function restart_net() {
+    service network restart && exit 0
+    restart_net
+}
+function set_hosts_resolve() {
+    local key="k8s-node-2"
+    if [ -n "${1}" ]; then
+        key="${1}"
+    fi
+    sed -i "s/127.0.0.1.*//g" /etc/hosts
+    sed -i "s/::1.*//g" /etc/hosts
+    sed -i "s/^$//g" /etc/hosts
+    echo "127.0.0.1 $key" >>/etc/hosts
+    echo "::1 $key" >>/etc/hosts
+}
+function vm_close() {
+    local key="k8s-node-2"
+    if [ -n "${1}" ]; then
+        key="${1}"
+    fi
+    VBoxManage list runningvms | sed "s#{.*}##g" | grep "$key"
+    if [ $? -eq 0 ]; then
+        VBoxManage controlvm "$key" poweroff
+        # 30s is too long
+        time_to_waite=15
+        echo "advice wait $time_to_waite s,please wait ..."
+        smart_sleep "-" $time_to_waite
+    fi
+}
+function vm_start() {
+    local key="k8s-node-2"
+    if [ -n "${1}" ]; then
+        key="${1}"
+    fi
+    VBoxManage list runningvms | sed "s#{.*}##g" | grep "$key"
+    if [ $? -eq 0 ]; then
+        echo "has been started before" >/dev/null 2>&1
+    else
+        VBoxManage startvm "$key" --type headless
+        # 180 is too long
+        time_to_waite=90
+        echo "advice wait $time_to_waite s,please wait ..."
+        smart_sleep "-" $time_to_waite
+    fi
+}
+function vm_restart() {
+    local key="k8s-node-2"
+    if [ -n "${1}" ]; then
+        key="${1}"
+    fi
+    vm_close "$key"
+    vm_start "$key"
 }
 function start() {
     echo "start vm"
@@ -96,6 +188,12 @@ function init_stack_master() {
     for key in $(echo ${!DIC_HOST_IP_LIST[*]}); do
         if [[ "$key" =~ $master_label ]]; then
             echo "master vm $key init k8s master"
+            vm_start "$key"
+            ip=${DIC_HOST_IP_LIST["$master_label"]}
+            ssh -t -t -i ${PRIVITE_KEY_FILE_PATH}${PRIVITE_KEY_FILE_NAME} root@$ip <<EOF
+pwd
+ls
+EOF
         fi
     done
 }
