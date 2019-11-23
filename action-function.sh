@@ -49,17 +49,23 @@ function start() {
     echo "start vm"
     for key in $(echo ${!DIC_HOST_IP_LIST[*]}); do
         #start vm
-        VBoxManage list runningvms | sed "s#{.*}##g" | grep "$key"
+        VBoxManage list vms | sed "s#{.*}##g" | grep "$key"
         if [ $? -eq 0 ]; then
-            echo "has been started before" >/dev/null 2>&1
-        else
-            echo "start vm $key "
-            echo "advice wait a minute,please wait ..."
-            VBoxManage list vms | sed "s#{.*}##g" | grep "$key"
+            VBoxManage list runningvms | sed "s#{.*}##g" | grep "$key"
             if [ $? -eq 0 ]; then
-                VBoxManage startvm $NEW_VM_NAME --type headless
-                sleep 60
+                echo "$key has been started before"
+            else
+                echo "start vm $key "
+                echo "advice wait a minute,please wait ..."
+                VBoxManage list vms | sed "s#{.*}##g" | grep "$key"
+                if [ $? -eq 0 ]; then
+                    VBoxManage startvm $NEW_VM_NAME --type headless
+                    sleep 60
+                fi
             fi
+        else
+            #echo "vm $key does not exsits" >/dev/null 2>&1
+            echo "vm $key does not exsits"
         fi
     done
 }
