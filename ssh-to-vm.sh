@@ -37,6 +37,9 @@ NEW_VM_NET_CARD_NAME=eth0
 NEW_VM_NETMASK=255.255.255.0
 #网关地址
 NEW_VM_GATEWAY=192.168.2.1
+#电脑地址
+NEW_VM_IPADDR=192.168.2.20
+
 ###
 # 定义内置函数
 ###
@@ -130,6 +133,31 @@ function get_help_msg() {
     fi
   fi
   echo "$USAGE_MSG"
+}
+function smart_sleep() {
+  local PROGRESS_CHAR="."
+  if [ -n "${1}" ]; then
+    PROGRESS_CHAR="${1}"
+  fi
+  local TIME_LONG=60
+  if [ -n "${2}" ]; then
+    TIME_LONG="${2}"
+  fi
+  local MOD=
+  while [ $TIME_LONG -gt 0 ]; do
+    sleep 1
+    TIME_LONG=$(expr $TIME_LONG - 1)
+    MOD=$(expr $TIME_LONG % 10)
+    if [ $MOD = "0" ]; then
+      if [ $TIME_LONG = "0" ]; then
+        echo "*"
+      else
+        echo -n "*"
+      fi
+    else
+      echo -n "$PROGRESS_CHAR"
+    fi
+  done
 }
 # 引入相关文件
 PROJECT_PATH=$(path_resolve $THIS_FILE_PATH "../")
@@ -240,7 +268,13 @@ fi
 ###
 #脚本主要代码
 ###
-ouput_debug_msg "caculate relations config ..." "true"
+PROJECT_PATH=$(path_resolve $THIS_FILE_PATH "../")
+HELP_DIR=$(path_resolve $THIS_FILE_PATH "../help")
+SRC_DIR=$(path_resolve $THIS_FILE_PATH "../src")
+TEST_DIR=$(path_resolve $THIS_FILE_PATH "../test")
+DIST_DIR=$(path_resolve $THIS_FILE_PATH "../dist")
+DOCS_DIR=$(path_resolve $THIS_FILE_PATH "../docs")
+TOOL_DIR=$(path_resolve $THIS_FILE_PATH "../tool")
 #新的主机基径
 NEW_VM_BASE_FOLEDR=${VMs_PATH}${PATH_SPLIT_SYMBOL}${NEW_VM_PATH}
 
@@ -250,19 +284,24 @@ NEW_VM_PATH=$NEW_VM_NAME
 #新的主机host名字
 NEW_VM_HOST_NAME=$NEW_VM_NAME
 #电脑地址
-NEW_VM_IPADDR=$NEW_VM_SSH_SERVER_IP
+NEW_VM_IPADDR=$NEW_VM_IP
 
-ouput_debug_msg "generate relations dir and file ..." "true"
 mkdir -p $VMs_PATH
 cd $VMs_PATH
 cd $NEW_VM_PATH
-echo $OLD_VM_IP,$VMs_PATH,$NEW_VM_PATH
+echo "template_vm ip is $OLD_VM_IP"
 
 if [ -n "$OLD_VM_NAME" ]; then
   OLD_VM_SSH_SERVER_USER=$OLD_VM_NAME
 fi
 if [ -n "$OLD_VM_IP" ]; then
   OLD_VM_SSH_SERVER_IP=$OLD_VM_IP
+fi
+if [ -n "$NEW_VM_NAME" ]; then
+  NEW_VM_SSH_SERVER_USER=$NEW_VM_NAME
+fi
+if [ -n "$NEW_VM_IP" ]; then
+  NEW_VM_SSH_SERVER_IP=$NEW_VM_IP
 fi
 # 启动新的主机
 VBoxManage list runningvms | sed "s#{.*}##g" | grep $NEW_VM_NAME
@@ -271,8 +310,92 @@ if [ $? -eq 0 ]; then
 else
   ouput_debug_msg "start new vm ..." "true"
   VBoxManage startvm $NEW_VM_NAME --type headless
+  # 180s is too long
+  time_to_waite=90
+  echo "advice wait $time_to_waite s,please wait ..."
+  #fix:ssh: connect to host 192.168.2.xx port 22: Connection timed out
+  smart_sleep "-" $time_to_waite
 fi
-sleep 60
 
-# 免密登录主机
-ssh -i ${PRIVITE_KEY_FILE_PATH}${PRIVITE_KEY_FILE_NAME} $OLD_VM_SSH_SERVER_USER@$OLD_VM_SSH_SERVER_IP
+# 远程登录主机
+#ssh -i ${PRIVITE_KEY_FILE_PATH}${PRIVITE_KEY_FILE_NAME} $OLD_VM_SSH_SERVER_USER@$OLD_VM_SSH_SERVER_IP
+
+# 编写本地文本
+# 执行本地文本
+LOCAL_SCRIPT_TXT=$(
+  cat <<EOF
+# echo var
+echo $NEW_VM_HOST_NAME
+echo $NEW_VM_IPADDR
+EOF
+)
+#echo "$LOCAL_SCRIPT_TXT"
+
+ssh -t -t -i ${PRIVITE_KEY_FILE_PATH}${PRIVITE_KEY_FILE_NAME} $OLD_VM_SSH_SERVER_USER@$OLD_VM_SSH_SERVER_IP <<EOF
+
+  $LOCAL_SCRIPT_TXT
+# 设置
+  hostnamectl set-hostname $NEW_VM_HOST_NAME
+  # 设置
+  sed -i "s/127.0.0.1.*//g" /etc/hosts
+  sed -i '/^\s*$/d' /etc/hosts
+  echo "127.0.0.1 $NEW_VM_HOST_NAME" >>/etc/hosts
+  #sed -i "/::1 */ s/$/ $NEW_VM_HOST_NAME/g" /etc/hosts
+  sed -i "s/::1.*//g" /etc/hosts
+  sed -i '/^\s*$/d' /etc/hosts
+
+sed -i '/^\s$NEW_VM_IPADDR /d' /etc/hosts
+echo "::1 $NEW_VM_HOST_NAME" >>/etc/hosts
+  # 查看
+  cat /etc/hosts
+#set static ip
+
+sed -i 's/BOOTPROTO=.*//g' /etc/sysconfig/network-scripts/ifcfg-${NEW_VM_NET_CARD_NAME}
+sed -i 's/ONBOOT=.*//g' /etc/sysconfig/network-scripts/ifcfg-${NEW_VM_NET_CARD_NAME}
+sed -i 's/IPADDR=.*//g' /etc/sysconfig/network-scripts/ifcfg-${NEW_VM_NET_CARD_NAME}
+sed -i 's/NETMASK=.*//g' /etc/sysconfig/network-scripts/ifcfg-${NEW_VM_NET_CARD_NAME}
+sed -i 's/GATEWAY=.*//g' /etc/sysconfig/network-scripts/ifcfg-${NEW_VM_NET_CARD_NAME}
+sed -i '/^\s*$/d' /etc/sysconfig/network-scripts/ifcfg-${NEW_VM_NET_CARD_NAME} # 删除空格
+cat >>/etc/sysconfig/network-scripts/ifcfg-${NEW_VM_NET_CARD_NAME} <<centos-set-static-ip-address
+IPADDR=${NEW_VM_IPADDR}
+NETMASK=${NEW_VM_NETMASK}
+GATEWAY=${NEW_VM_GATEWAY}
+BOOTPROTO=static
+ONBOOT=yes
+centos-set-static-ip-address
+cat /etc/sysconfig/network-scripts/ifcfg-${NEW_VM_NET_CARD_NAME}
+
+service network  restart && exit 0
+EOF
+
+# 重启
+VBoxManage list runningvms | sed "s#{.*}##g" | grep $NEW_VM_NAME
+if [ $? -eq 0 ]; then
+  ouput_debug_msg "close new vm ..." "true"
+  VBoxManage controlvm $NEW_VM_NAME poweroff
+  # 30s is too long
+  time_to_waite=15
+  echo "advice wait $time_to_waite s,please wait ..."
+  smart_sleep "-" $time_to_waite
+fi
+VBoxManage list runningvms | sed "s#{.*}##g" | grep $NEW_VM_NAME
+if [ $? -eq 0 ]; then
+  echo "has been started before" >/dev/null 2>&1
+else
+  ouput_debug_msg "start new vm ..." "true"
+  VBoxManage startvm $NEW_VM_NAME --type headless
+  # 180 is too long
+  time_to_waite=90
+  echo "advice wait $time_to_waite s,please wait ..."
+  smart_sleep "-" $time_to_waite
+fi
+#
+#question: connect to host 192.168.2.22 port 22: Connection timed
+echo "try to ssh to host with new ip $NEW_VM_IP..."
+ssh -t -t -i ${PRIVITE_KEY_FILE_PATH}${PRIVITE_KEY_FILE_NAME} $NEW_VM_NAME@$NEW_VM_IP <<EOF
+function restart_net(){
+service network  restart && exit 0
+restart_net
+}
+restart_net
+EOF
