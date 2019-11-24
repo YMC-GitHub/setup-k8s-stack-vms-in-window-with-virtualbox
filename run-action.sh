@@ -25,7 +25,7 @@ for var in ${ACTION_LIST_ARR[@]}; do
     if [[ "$var" =~ $REG_SHELL_COMMOMENT_PATTERN ]]; then
         echo "$var" >/dev/null 2>&1
     else
-        #echo "$var"
+        var=$(echo "$var" | cut --fields 1 --delimiter "=")
         action=${DIC_ACTION_LIST["$var"]}
         if [ -n "$action" ]; then
             $action
