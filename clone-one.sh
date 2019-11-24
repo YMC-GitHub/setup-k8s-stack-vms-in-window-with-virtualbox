@@ -251,7 +251,7 @@ if [[ "$ACTIONS" =~ 'clone_old_vm' ]]; then
   VBoxManage list runningvms | sed "s#{.*}##g" | grep $VM_NAME
   if [ $? -eq 0 ]; then
     VBoxManage controlvm $VM_NAME poweroff
-    smart_sleep "2" 10
+    smart_sleep "-" 10
   fi
   # 克隆被克隆机
   VBoxManage list vms | sed "s#{.*}##g" | grep $NEW_VM_NAME
@@ -259,6 +259,6 @@ if [[ "$ACTIONS" =~ 'clone_old_vm' ]]; then
     echo "vm exists" >/dev/null 2>&1
   else
     VBoxManage clonevm $VM_NAME --name $NEW_VM_NAME --register --basefolder $VMs_PATH
-    smart_sleep "2" 40
+    smart_sleep "-" 40
   fi
 fi
