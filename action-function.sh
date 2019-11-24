@@ -125,7 +125,7 @@ function vm_close() {
     if [ -n "${1}" ]; then
         key="${1}"
     fi
-    VBoxManage list runningvms | sed "s#{.*}##g" | grep "$key"
+    temp=$(VBoxManage list runningvms | sed "s#{.*}##g" | grep "$key")
     if [ $? -eq 0 ]; then
         VBoxManage controlvm "$key" poweroff
         # 30s is too long
@@ -139,7 +139,7 @@ function vm_start() {
     if [ -n "${1}" ]; then
         key="${1}"
     fi
-    VBoxManage list runningvms | sed "s#{.*}##g" | grep "$key"
+    temp=$(VBoxManage list runningvms | sed "s#{.*}##g" | grep "$key")
     if [ $? -eq 0 ]; then
         echo "has been started before" >/dev/null 2>&1
     else
@@ -162,21 +162,9 @@ function start() {
     echo "start vm"
     for key in $(echo ${!DIC_HOST_IP_LIST[*]}); do
         #start vm
-        VBoxManage list vms | sed "s#{.*}##g" | grep "$key"
+        temp=$(VBoxManage list vms | sed "s#{.*}##g" | grep "$key")
         if [ $? -eq 0 ]; then
-            VBoxManage list runningvms | sed "s#{.*}##g" | grep "$key"
-            if [ $? -eq 0 ]; then
-                echo "$key has been started before"
-            else
-                echo "start vm $key "
-                VBoxManage list vms | sed "s#{.*}##g" | grep "$key"
-                if [ $? -eq 0 ]; then
-                    VBoxManage startvm $key --type headless
-                    echo "advice wait a minute,please wait ..."
-                    smart_sleep "-" 180
-                    #sleep 60
-                fi
-            fi
+            vm_start "$key"
         else
             #echo "vm $key does not exsits" >/dev/null 2>&1
             echo "vm $key does not exsits"
@@ -189,10 +177,24 @@ function init_stack_master() {
         if [[ "$key" =~ $master_label ]]; then
             echo "master vm $key init k8s master"
             vm_start "$key"
-            ip=${DIC_HOST_IP_LIST["$master_label"]}
+            ip=${DIC_HOST_IP_LIST["$key"]}
+            K8S_PATH=/root/k8s
+            K8S_VERISON="1.15.3"
+            CALICO_DIR=calico
+            CALICO_VERSION=v3.8
+            CALICO_LOCAL_FILE=calico.yaml
+            DASHBOARD_DIR=dashboard
+            DASHBOARD_VERSION=v1.10.1
+            DASHBOARD_NS=kubernetes-dashboard
+            DASHBOARD_LOCAL_FILE=kubernetes-dashboard.yaml
             ssh -t -t -i ${PRIVITE_KEY_FILE_PATH}${PRIVITE_KEY_FILE_NAME} root@$ip <<EOF
-pwd
-ls
+cd $K8S_PATH
+kubeadm init --config=kubeadm-init-k8s-${K8S_VERISON}.yaml
+
+#uses caclio net work
+kubectl apply --filename $CALICO_DIR/$CALICO_VERSION/$CALICO_LOCAL_FILE
+#uses ui borad
+kubectl apply --filename ${DASHBOARD_DIR}/${DASHBOARD_VERSION}/${DASHBOARD_LOCAL_FILE}
 EOF
         fi
     done
